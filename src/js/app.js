@@ -28,11 +28,26 @@ App = {
       App.contracts.Election = TruffleContract(election);
       // Connect provider to interact with contract
       App.contracts.Election.setProvider(App.web3Provider);
+      //this is done for listening to even in our case this is the voting event
+      App.listenForEvents();
 
       return App.render();
     });
   },
-
+  //it gets the trigger from Election.sol smart contract.
+  listenForEvents: function(){
+    App.contracts.Election.deployed().then(function(instance){
+      instance.votedEvent({}, {
+        //used to listen from start to latest block on the blockchain for the event
+        fromBlock: 0,
+        toBlock: 'latest'
+      }).watch(function(error, event){
+        //in case an event happens we want to refresh the page automatically.
+        console.log("even triggered", event)
+        App.render();
+      });
+    });
+  },
   render: function() {
     var electionInstance;
     var loader = $("#loader");
@@ -57,6 +72,9 @@ App = {
       var candidatesResults = $("#candidatesResults");
       candidatesResults.empty();
 
+      var candidatesSelect = $('#candidatesSelect');
+      candidatesSelect.empty();
+
       for (var i = 1; i <= candidatesCount; i++) {
         electionInstance.candidates(i).then(function(candidate) {
           var id = candidate[0];
@@ -66,13 +84,36 @@ App = {
           // Render candidate Result
           var candidateTemplate = "<tr><th>" + id + "</th><td>" + name + "</td><td>" + voteCount + "</td></tr>"
           candidatesResults.append(candidateTemplate);
+
+          // Render candidate ballot option
+          var candidateOption = "<option value='" + id + "' >" + name + "</ option>"
+          candidatesSelect.append(candidateOption);
         });
       }
-
+      return electionInstance.voters(App.account);
+    }).then(function(hasVoted) {
+      // Do not allow a user to vote
+      if(hasVoted) {
+        $('form').hide();
+      }
       loader.hide();
       content.show();
     }).catch(function(error) {
       console.warn(error);
+    });
+  },
+  castVote: function() {
+    var candidateId = $('#candidatesSelect').val();
+    App.contracts.Election.deployed().then(function(instance) {
+      return instance.vote(candidateId, { from: App.account });
+    }).then(function(result) {
+      // Wait for votes to update
+      $("#content").hide();
+      $("#loader").show();
+    //used to catch any error report while voting candidate out of bounds
+    //or duplicate voting..
+    }).catch(function(err) {
+      console.error(err);
     });
   }
 };

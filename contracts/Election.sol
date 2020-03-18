@@ -26,6 +26,11 @@ contract Election{
 	//store voted accounts
 	mapping(address=>bool)public voters;
 	
+	//to track the event of voting for an auto refresh.
+	event votedEvent (
+        uint indexed _candidateId
+    );
+	
 	//store candidate count
 	//increment as you add candidates
 	uint public candidatesCount;
@@ -57,6 +62,8 @@ contract Election{
 		voters[msg.sender] = true;
 
 		candidates[_candidateId].voteCount++;
+
+		emit votedEvent(_candidateId);
 
 	}
 }
